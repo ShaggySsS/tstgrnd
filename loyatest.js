@@ -28,7 +28,7 @@ const box=document.createElement("div");
 box.id="lcw_box";
 box.innerHTML=`
   <div id="lcw_head">
-    <span>Kalkucačka oddanosti</span>
+    <span>Kalkulačka oddanosti</span>
     <button id="lcw_close" title="Zavřít">✕</button>
   </div>
   <div id="lcw_body">
