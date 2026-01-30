@@ -73,10 +73,6 @@ $("#lcw_close").onclick=()=>{removeOld();};
 
 function saveState(p){const s=JSON.parse(localStorage.getItem(KEY)||"{}");Object.assign(s,p);localStorage.setItem(KEY,JSON.stringify(s));}
 
-manualChk.onchange=()=>{manualWrap.style.display=manualChk.checked?"block":"none";saveState({manual:manualChk.checked});update();}
-inpLoy.oninput=()=>{saveState({manualLoy:inpLoy.value});update();}
-inpTime.oninput=()=>{saveState({manualTime:inpTime.value});update();}
-
 function parseCZDateTime(s){
   if(!s) return null;
   s=(s+"").replace(/\u00A0/g," ").trim();
@@ -100,6 +96,31 @@ function getServerNow(){
   return new Date();
 }
 
+function pad2(n){ return String(n).padStart(2,"0"); }
+function nowAsCZDateTime(){
+  const d=getServerNow();
+  return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+manualChk.onchange=()=>{
+  manualWrap.style.display=manualChk.checked?"block":"none";
+  saveState({manual:manualChk.checked});
+
+  // QOL: předvyplnit dnešní datum + aktuální čas, když je pole prázdné
+  if(manualChk.checked){
+    const cur=(inpTime.value||"").trim();
+    if(!cur){
+      inpTime.value=nowAsCZDateTime();
+      saveState({manualTime:inpTime.value});
+    }
+  }
+
+  update();
+};
+
+inpLoy.oninput=()=>{saveState({manualLoy:inpLoy.value});update();}
+inpTime.oninput=()=>{saveState({manualTime:inpTime.value});update();}
+
 function getSpeed(){
   const raw=localStorage.getItem("world_config");
   if(!raw) return null;
@@ -111,10 +132,20 @@ function getSpeed(){
 function readReport(){
   let loyalty=null,battleTime=null;
   const th=[...document.querySelectorAll("#attack_results th")].find(x=>/Oddanost/i.test(x.textContent||""));
-  if(th){const td=th.nextElementSibling;const txt=(td?.textContent||"").trim();const nums=txt.split(/\s+/).filter(x=>!isNaN(x)).map(Number);if(nums.length>=2)loyalty=parseInt(nums[1],10);else if(nums.length>=1)loyalty=parseInt(nums[0],10);}
+  if(th){
+    const td=th.nextElementSibling;
+    const txt=(td?.textContent||"").trim();
+    const nums=txt.split(/\s+/).filter(x=>!isNaN(x)).map(Number);
+    if(nums.length>=2)loyalty=parseInt(nums[1],10);
+    else if(nums.length>=1)loyalty=parseInt(nums[0],10);
+  }
   const t=document.querySelector(".small.grey")?.parentElement?.textContent?.trim();
   if(t) battleTime=parseCZDateTime(t);
-  if(!battleTime){const body=document.body.innerText.replace(/\u00A0/g," ");const m=body.match(/Čas\s*boje\s*[:\-]?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{2,4}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})/i);if(m)battleTime=parseCZDateTime(m[1]);}
+  if(!battleTime){
+    const body=document.body.innerText.replace(/\u00A0/g," ");
+    const m=body.match(/Čas\s*boje\s*[:\-]?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{2,4}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})/i);
+    if(m)battleTime=parseCZDateTime(m[1]);
+  }
   return {loyalty,battleTime};
 }
 
@@ -125,16 +156,38 @@ function estimateNobles(L){
 }
 
 function update(){
-  const speed=getSpeed();$("#lcw_spd").textContent=speed!=null?`${speed} / hod`:"–";
+  const speed=getSpeed();
+  $("#lcw_spd").textContent=speed!=null?`${speed} / hod`:"–";
+
   let loyalty,battleTime;
-  if(manualChk.checked){loyalty=parseInt(inpLoy.value,10);battleTime=parseCZDateTime(inpTime.value);}else{const r=readReport();loyalty=r.loyalty;battleTime=r.battleTime;}
+  if(manualChk.checked){
+    loyalty=parseInt(inpLoy.value,10);
+    battleTime=parseCZDateTime(inpTime.value);
+  }else{
+    const r=readReport();
+    loyalty=r.loyalty;
+    battleTime=r.battleTime;
+  }
+
   $("#lcw_loy").textContent=(!isNaN(loyalty)?loyalty:"–");
   $("#lcw_bt").textContent=(battleTime&& !isNaN(battleTime.getTime()))?battleTime.toLocaleString():"–";
-  if(speed==null||isNaN(loyalty)||!battleTime||isNaN(battleTime.getTime())){$("#lcw_el").textContent="–";$("#lcw_now_val").textContent="–";$("#lcw_nob_lbl").textContent="Šlechtici: –";return;}
-  const now=getServerNow(),hours=(now-battleTime)/(1000*60*60),est=Math.min(100,loyalty+hours*speed);
+
+  if(speed==null||isNaN(loyalty)||!battleTime||isNaN(battleTime.getTime())){
+    $("#lcw_el").textContent="–";
+    $("#lcw_now_val").textContent="–";
+    $("#lcw_nob_lbl").textContent="Šlechtici: –";
+    return;
+  }
+
+  const now=getServerNow();
+  const hours=(now-battleTime)/(1000*60*60);
+  const est=Math.min(100,loyalty+hours*speed);
+
   $("#lcw_el").textContent=`${Math.floor(hours)}h ${Math.floor((hours%1)*60)}m`;
   $("#lcw_now_val").textContent=Math.floor(est);
-  const n=estimateNobles(Math.floor(est));$("#lcw_nob_lbl").textContent=`Šlechtici: ≈ ${n.avg} (rozsah ${n.best}–${n.worst})`;
+
+  const n=estimateNobles(Math.floor(est));
+  $("#lcw_nob_lbl").textContent=`Šlechtici: ≈ ${n.avg} (rozsah ${n.best}–${n.worst})`;
 }
 
 update();
