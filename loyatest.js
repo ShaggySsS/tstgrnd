@@ -25,7 +25,7 @@ const box=document.createElement("div");
 box.id="lcw_box";
 box.innerHTML=`
   <div id="lcw_head">
-    <span>Kalkulačka oddanosti</span>
+    <span>Kalkulačka Oddanosti</span>
     <button id="lcw_close" title="Zavřít">✕</button>
   </div>
   <div id="lcw_body">
@@ -36,11 +36,11 @@ box.innerHTML=`
       </label>
       <div id="lcw_manual_wrap" style="margin-top:8px;display:none">
         <div>
-          <div id="lcw_small">Počáteční oddanost</div>
+          <div id="lcw_small">Oddanost po útoku</div>
           <input id="lcw_inp_loy" class="lcw_inp" type="number" min="0" max="100" placeholder="např. 52">
         </div>
         <div style="margin-top:8px">
-          <div id="lcw_small">Čas počáteční oddanosti (DD.MM.YYYY HH:MM:SS)</div>
+          <div id="lcw_small">Čas boje (DD.MM.YYYY HH:MM:SS)</div>
           <input id="lcw_inp_time" class="lcw_inp" type="text" inputmode="numeric" placeholder="např. 28.01.2026 21:30:00">
         </div>
         <div id="lcw_small" style="margin-top:6px">
@@ -50,16 +50,16 @@ box.innerHTML=`
     </div>
 
     <div id="lcw_main">
-      <div id="lcw_now_lbl">Odhadovaná aktuální oddanost</div>
+      <div id="lcw_now_lbl">Odhad aktuální oddanosti</div>
       <div id="lcw_now_val">–</div>
-      <div id="lcw_nob_lbl">Potřeba šlechticů: –</div>
+      <div id="lcw_nob_lbl">Šlechtici: –</div>
     </div>
 
     <table id="lcw_table">
-      <tr><td>Počáteční oddanost:</td><td id="lcw_loy">–</td></tr>
-      <tr><td>Čas počáteční oddanosti:</td><td id="lcw_bt">–</td></tr>
-      <tr><td>Rychlost regenerace:</td><td id="lcw_spd">–</td></tr>
-      <tr><td>Uběhlo od počáteční oddanosti:</td><td id="lcw_el">–</td></tr>
+      <tr><td>Oddanost po boji:</td><td id="lcw_loy">–</td></tr>
+      <tr><td>Čas boje:</td><td id="lcw_bt">–</td></tr>
+      <tr><td>Rychlost regen:</td><td id="lcw_spd">–</td></tr>
+      <tr><td>Uběhlo:</td><td id="lcw_el">–</td></tr>
     </table>
 
     <div id="lcw_small">Výpočet je odhad (20–35 na šlechtice).</div>
