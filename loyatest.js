@@ -1,5 +1,5 @@
 javascript:(()=>{try{
-const KEY="loyalty_calc_widget_v4";
+const KEY="loyalty_calc_widget_v4_pos";
 const state=JSON.parse(localStorage.getItem(KEY)||"{}");
 const css=`
 #lcw_box{position:fixed;z-index:99999;left:${state.x??30}px;top:${state.y??120}px;width:350px;background:#f6f2e8;border:1px solid #a28b5c;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Verdana,Arial,sans-serif;color:#3c2f1e}
@@ -35,8 +35,17 @@ box.innerHTML=`
         Ruční zadání
       </label>
       <div id="lcw_manual_wrap" style="margin-top:8px;display:none">
-        <div><div id="lcw_small">Oddanost po útoku</div><input id="lcw_inp_loy" class="lcw_inp" type="number" min="0" max="100" placeholder="např. 52"></div>
-        <div style="margin-top:8px"><div id="lcw_small">Čas boje (DD.MM.YYYY HH:MM:SS)</div><input id="lcw_inp_time" class="lcw_inp" type="text" placeholder="např. 28.01.2026 21:30:00"></div>
+        <div>
+          <div id="lcw_small">Oddanost po útoku</div>
+          <input id="lcw_inp_loy" class="lcw_inp" type="number" min="0" max="100" placeholder="např. 52">
+        </div>
+        <div style="margin-top:8px">
+          <div id="lcw_small">Čas boje (DD.MM.YYYY HH:MM:SS)</div>
+          <input id="lcw_inp_time" class="lcw_inp" type="text" inputmode="numeric" placeholder="např. 28.01.2026 21:30:00">
+        </div>
+        <div id="lcw_small" style="margin-top:6px">
+          Tip: napiš jen čísla času (např. <b>093320</b>) → doplní se jako <b>09:33:20</b>
+        </div>
       </div>
     </div>
 
@@ -64,14 +73,13 @@ const manualWrap=$("#lcw_manual_wrap");
 const inpLoy=$("#lcw_inp_loy");
 const inpTime=$("#lcw_inp_time");
 
-manualChk.checked=!!state.manual;
-manualWrap.style.display=manualChk.checked?"block":"none";
-inpLoy.value=state.manualLoy||"";
-inpTime.value=state.manualTime||"";
-
 $("#lcw_close").onclick=()=>{removeOld();};
 
-function saveState(p){const s=JSON.parse(localStorage.getItem(KEY)||"{}");Object.assign(s,p);localStorage.setItem(KEY,JSON.stringify(s));}
+function savePos(p){
+  const s=JSON.parse(localStorage.getItem(KEY)||"{}");
+  Object.assign(s,p);
+  localStorage.setItem(KEY,JSON.stringify(s));
+}
 
 function parseCZDateTime(s){
   if(!s) return null;
@@ -97,30 +105,30 @@ function getServerNow(){
 }
 
 function pad2(n){ return String(n).padStart(2,"0"); }
-function nowAsCZDateTime(){
+
+function todayZeroTime(){
   const d=getServerNow();
-  return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()} 00:00:00`;
 }
 
-manualChk.onchange=()=>{
-  manualWrap.style.display=manualChk.checked?"block":"none";
-  saveState({manual:manualChk.checked});
+// ====== TIME INPUT SMART (093320 -> 09:33:20) ======
+function extractDigits(str){ return (str||"").replace(/\D/g,""); }
 
-  // QOL: předvyplnit dnešní datum + aktuální čas, když je pole prázdné
-  if(manualChk.checked){
-    const cur=(inpTime.value||"").trim();
-    if(!cur){
-      inpTime.value=nowAsCZDateTime();
-      saveState({manualTime:inpTime.value});
-    }
-  }
+function formatTimeFromDigits(dig){
+  dig=(dig||"").slice(0,6);
+  const hh=dig.slice(0,2).padEnd(2,"0");
+  const mm=dig.slice(2,4).padEnd(2,"0");
+  const ss=dig.slice(4,6).padEnd(2,"0");
+  return `${hh}:${mm}:${ss}`;
+}
 
-  update();
-};
+function setTimeDigits(digits){
+  const baseDate = (inpTime.value||"").match(/^(\d{2}\.\d{2}\.\d{2,4})/)?.[1];
+  const datePart = baseDate || todayZeroTime().split(" ")[0];
+  inpTime.value = `${datePart} ${formatTimeFromDigits(digits)}`;
+}
 
-inpLoy.oninput=()=>{saveState({manualLoy:inpLoy.value});update();}
-inpTime.oninput=()=>{saveState({manualTime:inpTime.value});update();}
-
+// ====== read report ======
 function getSpeed(){
   const raw=localStorage.getItem("world_config");
   if(!raw) return null;
@@ -190,6 +198,73 @@ function update(){
   $("#lcw_nob_lbl").textContent=`Šlechtici: ≈ ${n.avg} (rozsah ${n.best}–${n.worst})`;
 }
 
+// ====== MANUAL DEFAULTS ======
+manualChk.checked=false;
+manualWrap.style.display="none";
+inpLoy.value="";
+inpTime.value="";
+
+manualChk.onchange=()=>{
+  manualWrap.style.display=manualChk.checked?"block":"none";
+
+  if(manualChk.checked){
+    // vždycky připrav dnešní datum + 00:00:00
+    inpTime.value=todayZeroTime();
+
+    // fokus rovnou do času (a vybere čas část)
+    inpTime.focus();
+    // vybrat jen časovou část (za mezerou)
+    setTimeout(()=>{
+      try{
+        const pos = inpTime.value.indexOf(" ")+1;
+        inpTime.setSelectionRange(pos, inpTime.value.length);
+      }catch(e){}
+    },0);
+  }
+
+  update();
+};
+
+inpLoy.oninput=()=>update();
+
+// chytrý psaní času
+inpTime.addEventListener("keydown",(e)=>{
+  if(!manualChk.checked) return;
+
+  // povolit navigaci / mazání
+  const allowedKeys=["Backspace","Delete","ArrowLeft","ArrowRight","Tab","Home","End"];
+  if(allowedKeys.includes(e.key)) return;
+
+  // povolit přepsání celého textu (ctrl+a)
+  if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==="a")) return;
+
+  // pokud je číslo, zpracujeme ho sami
+  if(/^\d$/.test(e.key)){
+    e.preventDefault();
+
+    // vezmeme aktuální digits z času
+    const curDigits = extractDigits(inpTime.value).slice(-6); // posledních 6 = HHMMSS
+    const next = (curDigits + e.key).slice(-6);
+
+    setTimeDigits(next);
+
+    // kurzor necháme vždycky na konci času
+    setTimeout(()=>{
+      try{
+        inpTime.setSelectionRange(inpTime.value.length, inpTime.value.length);
+      }catch(e){}
+    },0);
+
+    update();
+    return;
+  }
+
+  // bloknout ostatní znaky (ať se to nerozbije)
+  e.preventDefault();
+});
+
+inpTime.addEventListener("input",()=>update());
+
 update();
 
 // drag
@@ -197,6 +272,6 @@ let drag=false,dx=0,dy=0;
 const head=document.getElementById("lcw_head");
 head.addEventListener("mousedown",e=>{drag=true;const r=box.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;});
 document.addEventListener("mousemove",e=>{if(!drag)return;box.style.left=(e.clientX-dx)+"px";box.style.top=(e.clientY-dy)+"px";box.style.right="auto";box.style.bottom="auto";});
-document.addEventListener("mouseup",()=>{if(!drag)return;drag=false;saveState({x:parseInt(box.style.left,10),y:parseInt(box.style.top,10)});});
+document.addEventListener("mouseup",()=>{if(!drag)return;drag=false;savePos({x:parseInt(box.style.left,10),y:parseInt(box.style.top,10)});});
 
 }catch(err){alert("Chyba: "+(err?.message||err));}})();
