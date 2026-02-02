@@ -1,7 +1,6 @@
 javascript:(()=>{try{
 const KEY="loyalty_calc_widget_v4";
 const state=JSON.parse(localStorage.getItem(KEY)||"{}");
-
 const css=`
 #lcw_box{position:fixed;z-index:99999;left:${state.x??30}px;top:${state.y??120}px;width:350px;background:#f6f2e8;border:1px solid #a28b5c;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Verdana,Arial,sans-serif;color:#3c2f1e}
 #lcw_head{cursor:move;padding:8px 12px;background:linear-gradient(#d9c589,#b79e59);border-bottom:1px solid #a28b5c;border-radius:10px 10px 0 0;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;color:#2f2415}
@@ -18,7 +17,6 @@ const css=`
 .lcw_inp{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #a28b5c;border-radius:6px;background:#fff;font-size:12px}
 .lcw_chk{transform:translateY(1px)}
 `;
-
 const addStyle=()=>{const s=document.createElement("style");s.id="lcw_style";s.textContent=css;document.head.appendChild(s);}
 const removeOld=()=>{document.getElementById("lcw_style")?.remove();document.getElementById("lcw_box")?.remove();}
 removeOld(); addStyle();
@@ -37,14 +35,8 @@ box.innerHTML=`
         Ruční zadání
       </label>
       <div id="lcw_manual_wrap" style="margin-top:8px;display:none">
-        <div>
-          <div id="lcw_small">Oddanost po útoku</div>
-          <input id="lcw_inp_loy" class="lcw_inp" type="number" min="0" max="100" placeholder="např. 52">
-        </div>
-        <div style="margin-top:8px">
-          <div id="lcw_small">Čas boje (DD.MM.YYYY HH:MM:SS)</div>
-          <input id="lcw_inp_time" class="lcw_inp" type="text" placeholder="např. 28.01.2026 09:33:20">
-        </div>
+        <div><div id="lcw_small">Oddanost po útoku</div><input id="lcw_inp_loy" class="lcw_inp" type="number" min="0" max="100" placeholder="např. 52"></div>
+        <div style="margin-top:8px"><div id="lcw_small">Čas boje (DD.MM.YYYY HH:MM:SS)</div><input id="lcw_inp_time" class="lcw_inp" type="text" placeholder="např. 28.01.2026 21:30:00"></div>
       </div>
     </div>
 
@@ -72,13 +64,21 @@ const manualWrap=$("#lcw_manual_wrap");
 const inpLoy=$("#lcw_inp_loy");
 const inpTime=$("#lcw_inp_time");
 
-$("#lcw_close").onclick=()=>{removeOld();};
+/* ===========================
+   ZMĚNA #1: ruční zadání se NEpamatuje
+   => vždy startuje vypnuté
+=========================== */
+manualChk.checked=false;
+manualWrap.style.display="none";
 
+/* uložíme jen pozici okna */
 function saveState(p){
   const s=JSON.parse(localStorage.getItem(KEY)||"{}");
   Object.assign(s,p);
   localStorage.setItem(KEY,JSON.stringify(s));
 }
+
+$("#lcw_close").onclick=()=>{removeOld();};
 
 function parseCZDateTime(s){
   if(!s) return null;
@@ -104,41 +104,28 @@ function getServerNow(){
 }
 
 function pad2(n){ return String(n).padStart(2,"0"); }
-
-function todayAsCZDate(){
+function nowAsCZDateTime(){
   const d=getServerNow();
-  return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`;
+  return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 
-function setManualDefaultTime(){
-  // dnešní datum + 00:00:00
-  inpTime.value = `${todayAsCZDate()} 00:00:00`;
-}
+/* ===========================
+   ZMĚNA #2: při zapnutí ručního zadání
+   předvyplnit aktuální datum+čas
+=========================== */
+manualChk.onchange=()=>{
+  manualWrap.style.display=manualChk.checked?"block":"none";
 
-function normalizeTimeDigitsToFull(dtStr){
-  // očekává "DD.MM.YYYY " + čas, ale dovolí aby uživatel napsal jen 6 číslic
-  // např. "28.01.2026 093320" => "28.01.2026 09:33:20"
-  if(!dtStr) return dtStr;
+  if(manualChk.checked){
+    // vždy doplníme aktuální datum+čas (ale jde přepsat)
+    inpTime.value = nowAsCZDateTime();
+  }
 
-  dtStr = (dtStr+"").replace(/\u00A0/g," ").trim();
+  update();
+};
 
-  // pokud už je full formát, necháme
-  if(/^(\d{2})\.(\d{2})\.(\d{2,4})\s+\d{2}:\d{2}:\d{2}$/.test(dtStr)) return dtStr;
-
-  // varianta: DD.MM.YYYY + mezera + jen čísla (HHMMSS)
-  const m = dtStr.match(/^(\d{2}\.\d{2}\.\d{2,4})\s+(\d{1,6})$/);
-  if(!m) return dtStr;
-
-  const datePart = m[1];
-  let digits = m[2].replace(/\D/g,"");
-  digits = digits.padStart(6,"0").slice(-6);
-
-  const HH = digits.slice(0,2);
-  const MM = digits.slice(2,4);
-  const SS = digits.slice(4,6);
-
-  return `${datePart} ${HH}:${MM}:${SS}`;
-}
+inpLoy.oninput=()=>{update();}
+inpTime.oninput=()=>{update();}
 
 function getSpeed(){
   const raw=localStorage.getItem("world_config");
@@ -150,7 +137,6 @@ function getSpeed(){
 
 function readReport(){
   let loyalty=null,battleTime=null;
-
   const th=[...document.querySelectorAll("#attack_results th")].find(x=>/Oddanost/i.test(x.textContent||""));
   if(th){
     const td=th.nextElementSibling;
@@ -159,16 +145,13 @@ function readReport(){
     if(nums.length>=2)loyalty=parseInt(nums[1],10);
     else if(nums.length>=1)loyalty=parseInt(nums[0],10);
   }
-
   const t=document.querySelector(".small.grey")?.parentElement?.textContent?.trim();
   if(t) battleTime=parseCZDateTime(t);
-
   if(!battleTime){
     const body=document.body.innerText.replace(/\u00A0/g," ");
     const m=body.match(/Čas\s*boje\s*[:\-]?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{2,4}\s+[0-9]{2}:[0-9]{2}:[0-9]{2})/i);
     if(m)battleTime=parseCZDateTime(m[1]);
   }
-
   return {loyalty,battleTime};
 }
 
@@ -183,14 +166,8 @@ function update(){
   $("#lcw_spd").textContent=speed!=null?`${speed} / hod`:"–";
 
   let loyalty,battleTime;
-
   if(manualChk.checked){
     loyalty=parseInt(inpLoy.value,10);
-
-    // QOL: dovolí zadat jen čas jako 093320
-    const fixed = normalizeTimeDigitsToFull(inpTime.value);
-    if(fixed !== inpTime.value) inpTime.value = fixed;
-
     battleTime=parseCZDateTime(inpTime.value);
   }else{
     const r=readReport();
@@ -219,52 +196,6 @@ function update(){
   $("#lcw_nob_lbl").textContent=`Šlechtici: ≈ ${n.avg} (rozsah ${n.best}–${n.worst})`;
 }
 
-/* ========= ZMĚNY PODLE ZADÁNÍ ========= */
-
-// 1) Ruční zadání vždy startuje vypnuté
-manualChk.checked = false;
-manualWrap.style.display = "none";
-
-// 2) Neukládáme ruční hodnoty ani checkbox
-manualChk.onchange=()=>{
-  manualWrap.style.display=manualChk.checked?"block":"none";
-
-  if(manualChk.checked){
-    // vždy předvyplnit dnešní datum + 00:00:00
-    setManualDefaultTime();
-
-    // kurzor rovnou do času (za mezeru)
-    setTimeout(()=>{
-      inpTime.focus();
-      // nastavíme caret na začátek času
-      const pos = inpTime.value.indexOf(" ")+1;
-      inpTime.setSelectionRange(pos,pos);
-    },0);
-  }
-
-  update();
-};
-
-// 3) při psaní do času dovolíme "093320"
-inpTime.addEventListener("input", ()=>{
-  // pokud uživatel píše jen čísla a nechce klikat, držíme datum a měníme čas
-  // chování:
-  // - pokud smaže a napíše "093320" -> doplní se do "DD.MM.YYYY 09:33:20"
-  const v = (inpTime.value||"").replace(/\u00A0/g," ").trim();
-
-  // když user smaže vše, doplníme dnešní datum + mezera, aby mohl psát čas
-  if(v === ""){
-    inpTime.value = `${todayAsCZDate()} `;
-    const pos = inpTime.value.length;
-    inpTime.setSelectionRange(pos,pos);
-  }
-
-  update();
-});
-
-inpLoy.oninput=()=>{ update(); };
-
-// init
 update();
 
 // drag
